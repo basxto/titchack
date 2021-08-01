@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """
 Title Checksum Hack
 Copyright 2021 Sebastian "basxto" Riedel
