@@ -11,3 +11,9 @@ Set palette of ROM `myrom.cgb` to "Link's Awakening" (`0x70`) via title byte `0x
 ```sh
 ./titchack.py myrom.cgb '$142' '0x70'
 ```
+## Notice
+This only changes the specified byte from the title (0x134-0x143), which makes the checksums in the header incorrect. Palettes use the title checksum, which has nothing to do with the header checksum or global checksum.
+
+You still need to run `rgbfix -f h` (only header, will boot) or `rgbfix -f hg` (header and global) to fix those.
+
+Some original roms had checksums collision, those are distinguished by the 4th character of the title, which has to be set beforehand.
