@@ -37,6 +37,7 @@ def main(argv=None):
     parser.add_argument("--checksum", "-c", help="Target checksum (only for title checksum)")
     parser.add_argument("--offset", default="0x100", help="Offset where header begins (default: 0x100)")
     parser.add_argument("--mirror64", default="no", help="64b mirrored ROM (default: no)")
+    parser.add_argument("--ambiguous", "-a", default="no", help="Set 4th byte for ambiguous titles (default: no)")
     parser.add_argument("file", help="ROM file that should be fixed")
     parser.add_argument("address", help="Address of the byte that should be fixed")
     global args
@@ -71,6 +72,11 @@ def main(argv=None):
             exit()
 
     with open(args.file, "rb+") as infp:
+        # fix the fourth byte of title
+        if len(args.ambiguous) == 1:
+            infp.seek(offset + 0x38)
+            infp.write(bytes(args.ambiguous, "ascii"))
+
         infp.seek(offset)
         data = infp.read(maxa)
         if args.type != "header":
