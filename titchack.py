@@ -24,11 +24,6 @@ def str2int(x):
         y = int(x, base=10)
     return y
 
-def wrapAddress(addr, maxa):
-    while addr > maxa:
-        addr = addr - maxa
-    return addr
-
 def parse_argv(argv):
     p = argparse.ArgumentParser()
     p.add_argument("file")
@@ -41,7 +36,7 @@ def main(argv=None):
     parser.add_argument("--type", "-t", default="title", help="'title' (default) or 'header' checksum")
     parser.add_argument("--checksum", "-c", help="Target checksum (only for title checksum)")
     parser.add_argument("--offset", default="0x100", help="Offset where header begins (default: 0x100)")
-    #parser.add_argument("--64b", default="no", help="64b mirrored ROM")
+    parser.add_argument("--mirror64", default="no", help="64b mirrored ROM (default: no)")
     parser.add_argument("file", help="ROM file that should be fixed")
     parser.add_argument("address", help="Address of the byte that should be fixed")
     global args
@@ -53,20 +48,27 @@ def main(argv=None):
 
     offset = str2int(args.offset)
     maxa = 0x80 # maximum address at which to wrap
+    if args.mirror64 != "no":
+        maxa = 0x40
     base = 0x34 # base address for the checksum
     if args.type != "header":
         amount = 16
     else:
         amount = 25
     # translate address alreaty
-    address = wrapAddress(str2int(args.address) - offset, maxa)
+    address = (str2int(args.address) - offset) % maxa
 
     # minimum/maxim wrapped address
-    minwa = wrapAddress(base, maxa)
-    maxwa = wrapAddress(base + amount, maxa)
-    if (address < minwa or address > maxwa):
-        print('Address has to be between 0x{:04x} and 0x{:04x}'.format(minwa, maxwa))
-        exit()
+    minwa = base % maxa
+    maxwa = (base + amount) % maxa
+    if maxwa > minwa:
+        if (address < minwa or address > maxwa):
+            print('Address has to be between 0x{:04x} and 0x{:04x}'.format(offset + minwa, offset + maxwa))
+            exit()
+    else:
+        if (address < minwa and address > maxwa):
+            print('Address has to be between 0x{:04x} and 0x{:04x} or 0x{:04x} and 0x{:04x}'.format(offset, offset + maxwa, offset + minwa, offset + maxa))
+            exit()
 
     with open(args.file, "rb+") as infp:
         infp.seek(offset)
@@ -74,14 +76,14 @@ def main(argv=None):
         if args.type != "header":
             checksum = str2int(args.checksum)
         else:
-            checksum = data[wrapAddress(0x4D, maxa)]
+            checksum = data[0x4D % maxa]
             print("Actual header checksum is 0x{:02x}".format(checksum))
 
         # substract the wanted checksum from the real one
         checksum = -checksum
         for i in range(0, amount):
-            if wrapAddress(base + i, maxa) != address:
-                checksum += data[wrapAddress(base + i, maxa)]
+            if ((base + i) % maxa) != address:
+                checksum += data[(base + i) % maxa]
         # fix up if still negative
         if checksum < 0:
             checksum = 0xFF - checksum

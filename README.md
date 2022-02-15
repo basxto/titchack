@@ -29,10 +29,12 @@ Be warned that [0x143](https://gbdev.io/pandocs/The_Cartridge_Header.html#0143--
 
 # Header Checksum
 
+You can reduce the space occupied by the header and use unused bytes for the header. Like `$144/$145`(New Licensee Code), `$14A` (Destination Code) or unused characters of the title.
+
 ## Example
 
 ```sh
-./titchack.py -theader myrom.cgb '$13F'
+./titchack.py -theader myrom.cgb '#0x13F'
 ```
 
 ## Notice
