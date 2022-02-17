@@ -56,7 +56,7 @@ def main(argv=None):
     if args.type != "header":
         amount = 16
     else:
-        amount = 25
+        amount = 26
     # translate address alreaty
     address = (str2int(args.address) - offset) % maxa
 
@@ -81,11 +81,12 @@ def main(argv=None):
         infp.seek(offset)
         data = infp.read(maxa)
         if args.type != "header" and args.print == "no":
-            checksum = str2int(args.checksum)
+            checksum = -str2int(args.checksum)
         else:
-            checksum = data[0x4D % maxa]
-            print("[0x{:02x}] Header checksum byte is 0x{:02x}".format(offset + (0x4D % maxa), checksum))
+            checksum = 0x19
         if args.print != "no":
+            checksum = data[0x4D % maxa]
+            print("[0x{:02x}] Header checksum byte is 0x{:02x} (-0x{:02x})".format(offset + (0x4D % maxa), checksum,0xFF - ((checksum-1) & 0xFF)))
             if chr(data[(base + 4) % maxa]).isprintable():
                 print("[0x{0:02x}] Ambiguity char is '{1:c}' (0x{1:02x})".format(offset + ((base + 4) % maxa), data[(base + 4) % maxa]))
             else:
@@ -101,10 +102,10 @@ def main(argv=None):
             print("Real title checksum is 0x{:02x}".format(checksum & 0xFF))
             for i in range(16, 25):
                 checksum += data[(base + i) % maxa]
-            print("Real header checksum is 0x{:02x}".format((checksum-1) & 0xFF))
+            print("Real header checksum is 0x{:02x}".format((checksum+0x19) & 0xFF))
         else:
             # substract the wanted checksum from the real one
-            checksum = -checksum
+            #checksum = -checksum
             for i in range(0, amount):
                 if ((base + i) % maxa) != address:
                     checksum += data[(base + i) % maxa]
@@ -114,10 +115,6 @@ def main(argv=None):
 
             # calculate the 8b inverse in two's complement
             checksum = 0xFF - ((checksum-1) & 0xFF)
-
-            # header and title checksum are calculated slightly differently
-            if args.type == "header":
-                checksum = checksum + 1
 
             infp.seek(offset + address)
             infp.write(checksum.to_bytes(1, 'little'))
