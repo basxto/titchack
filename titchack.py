@@ -13,23 +13,22 @@ import argparse
 # convert str to integer and accept rgbds syntax
 def str2int(x):
     y = 0
-    x = x.replace('$', "0x", 1).replace('%', "0b", 1).replace('&', "0", 1).replace('#0', "0", 1).lower()
-    if (x[0] == '0' and x[1] == 'x'):
+    x = x.replace("$", "0x", 1).replace("%", "0b", 1).replace("&", "0", 1).replace("#0", "0", 1).lower()
+    if (x[0] == "0" and x[1] == "x"):
         y = int(x, base=16)
-    elif (x[0] == '0' and x[1] == 'b'):
+    elif (x[0] == "0" and x[1] == "b"):
         y = int(x, base=2)
-    elif (x[0] == '0'):
+    elif (x[0] == "0"):
         y = int(x, base=8)
     else:
         y = int(x, base=10)
     return y
 
-def parse_argv(argv):
-    p = argparse.ArgumentParser()
-    p.add_argument("file")
-    p.add_argument("address")
-    p.add_argument("checksum")
-    return p.parse_args(argv[1:])
+def dumpbyte(name, addr, offset, data):
+    if chr(data[addr]).isprintable():
+        print("[0x{0:02x}] {2:s} is '{1:c}' (0x{1:02x})".format(offset + addr, data[addr], name))
+    else:
+        print("[0x{0:02x}] {2:s} is 0x{1:02x}".format(offset + addr, data[addr], name))
 
 # 8 bit inverse
 def inv8b(num):
@@ -38,7 +37,7 @@ def inv8b(num):
 def main(argv=None):
     parser = argparse.ArgumentParser()
     parser.add_argument("--type", "-t", default="title", help="'title' (default), 'header' or 'both' checksums")
-    parser.add_argument("--checksum", "-c", help="Target checksum (only for title checksum)")
+    parser.add_argument("--checksum", "-c", help="Target checksum (type 'title' or 'both')")
     parser.add_argument("--offset", default="0x100", help="Offset where header begins (default: 0x100)")
     parser.add_argument("--mirror64", "-6", default="no", help="64b mirrored ROM (default: no)")
     parser.add_argument("--ambiguous", "-a", default="no", help="Set 4th char for ambiguous titles (default: no)")
@@ -46,6 +45,7 @@ def main(argv=None):
     parser.add_argument("file", help="ROM file that should be fixed")
     parser.add_argument("address", help="Address of the byte that should be fixed")
     parser.add_argument("--headeraddress", "--haddr", help="Address of the header byte that should be fixed (type 'both')")
+    parser.add_argument("--fixlicensee", "-l", default="no", help="Fix licensee byte (type 'title' or 'both')")
     global args
     args = parser.parse_args()
     if args.type != "header" and args.print == "no":
@@ -64,7 +64,7 @@ def main(argv=None):
         haddress = (str2int(args.headeraddress) - offset) % maxa
     
     if args.type != "header" and not args.checksum:
-        print('Title checksum needs a taget checksum')
+        print("Title checksum needs a taget checksum")
         exit()
 
     # minimum/maxim wrapped address
@@ -74,39 +74,57 @@ def main(argv=None):
         maxwa = (base + 26) % maxa
     if maxwa > minwa:
         if (address < minwa or address > maxwa):
-            print('Address has to be between 0x{:04x} and 0x{:04x}'.format(offset + minwa, offset + maxwa))
+            print("Address has to be between 0x{:04x} and 0x{:04x}".format(offset + minwa, offset + maxwa))
             exit()
     else:
         if (address < minwa and address > maxwa):
-            print('Address has to be between 0x{:04x} and 0x{:04x} or 0x{:04x} and 0x{:04x}'.format(offset, offset + maxwa, offset + minwa, offset + maxa))
+            print("Address has to be between 0x{:04x} and 0x{:04x} or 0x{:04x} and 0x{:04x}".format(offset, offset + maxwa, offset + minwa, offset + maxa))
             exit()
     if args.headeraddress:
+        if args.type == "header":
+            minwa = (base + 16) % maxa
         maxwa = (base + 26) % maxa
         if maxwa > minwa:
             if (haddress < minwa or haddress > maxwa):
-                print('Address has to be between 0x{:04x} and 0x{:04x}'.format(offset + minwa, offset + maxwa))
+                print("Address has to be between 0x{:04x} and 0x{:04x}".format(offset + minwa, offset + maxwa))
                 exit()
         else:
             if (haddress < minwa and haddress > maxwa):
-                print('Address has to be between 0x{:04x} and 0x{:04x} or 0x{:04x} and 0x{:04x}'.format(offset, offset + maxwa, offset + minwa, offset + maxa))
+                print("Address has to be between 0x{:04x} and 0x{:04x} or 0x{:04x} and 0x{:04x}".format(offset, offset + maxwa, offset + minwa, offset + maxa))
                 exit()
 
     with open(args.file, "rb+") as infp:
+        # set licensee to nintendo
+        if args.fixlicensee != "no":
+            infp.seek(offset)
+            data = infp.read(maxa)
+            if args.print == "no":
+                if data[base + 22] == 0x33:
+                    infp.seek(offset + base + 16)
+                    infp.write(bytes("01", "ascii"))
+                    print("Byte 0x{:02x} and 0x{:02x} set to '01'".format(offset + base + 16, offset + base + 17))
+                else:
+                    infp.seek(offset + base + 23)
+                    infp.write(0x1.to_bytes(1, "little"))
+                    print("Byte 0x{:02x} set to 0x{:02x}".format(offset + base + 23, 0x1))
+            else:
+                dumpbyte("Byte", base + 16, offset, data)
+                dumpbyte("Byte", base + 17, offset, data)
+                dumpbyte("Byte", base + 23, offset, data)
+
         # fix the fourth char of title
         if len(args.ambiguous) == 1 and args.print == "no":
-            infp.seek(offset + base + 4)
+            infp.seek(offset + base + 3)
             infp.write(bytes(args.ambiguous, "ascii"))
+            print("Byte 0x{:02x} set to '{:s}'".format(offset + base + 3, args.ambiguous))
 
         infp.seek(offset)
         data = infp.read(maxa)
         checksum = 0
         if args.print != "no" and args.type != "title":
-            print("[0x{:02x}] Header checksum byte is 0x{:02x} (-0x{:02x})".format(offset + (0x4D % maxa), data[0x4D % maxa],inv8b(data[0x4D % maxa])))
+            print("[0x{:02x}] Header checksum byte is 0x{:02x} (-0x{:02x})".format(offset + ((base+25) % maxa), data[(base+25) % maxa],inv8b(data[(base+25) % maxa])))
         if args.print != "no" and args.type != "header":
-            if chr(data[(base + 4) % maxa]).isprintable():
-                print("[0x{0:02x}] Ambiguity char is '{1:c}' (0x{1:02x})".format(offset + ((base + 4) % maxa), data[(base + 4) % maxa]))
-            else:
-                print("[0x{0:02x}] Ambiguity char is 0x{1:02x}".format(offset + ((base + 4) % maxa), data[(base + 4) % maxa]))
+            dumpbyte("Ambiguity char", (base + 3) % maxa, offset, data)
 
         for i in range(0, 16):
             if ((base + i) % maxa) != address:
@@ -120,14 +138,11 @@ def main(argv=None):
             if args.print == "no":
                 checksum += checksumfix
                 infp.seek(offset + address)
-                infp.write(checksumfix.to_bytes(1, 'little'))
+                infp.write(checksumfix.to_bytes(1, "little"))
                 print("Byte 0x{:02x} set to 0x{:02x}".format(offset + address, checksumfix))
             else:
                 checksum += data[address]
-                if chr(data[address]).isprintable():
-                    print("[0x{0:02x}] Byte is '{1:c}' (0x{1:02x})".format(offset + address, data[address]))
-                else:
-                    print("[0x{0:02x}] Byte is 0x{1:02x}".format(offset + address, data[address]))
+                dumpbyte("Byte", address, offset, data)
                 print("Real title checksum is 0x{:02x}".format(checksum & 0xFF))
         # fix header checksum
         if args.type != "title":
@@ -140,15 +155,12 @@ def main(argv=None):
             if args.print == "no":
                 checksum = inv8b(checksum)
                 infp.seek(offset + address)
-                infp.write(checksum.to_bytes(1, 'little'))
+                infp.write(checksum.to_bytes(1, "little"))
                 print("Byte 0x{:02x} set to 0x{:02x}".format(offset + address, checksum))
             else:
                 checksum += data[address]
                 checksum -= data[(base + 25) % maxa]
-                if chr(data[address]).isprintable():
-                    print("[0x{0:02x}] Byte is '{1:c}' (0x{1:02x})".format(offset + address, data[address]))
-                else:
-                    print("[0x{0:02x}] Byte is 0x{1:02x}".format(offset + address, data[address]))
+                dumpbyte("Byte", address, offset, data)
                 print("Real header checksum is 0x{:02x}".format(checksum & 0xFF))
 
 
