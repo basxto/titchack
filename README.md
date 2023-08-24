@@ -11,8 +11,10 @@ Palettes can be selected with the [correct checksum](https://tcrf.net/Notes:Game
 ## Example
 Set palette of ROM `myrom.cgb` to "Kirby's Block Ball (USA, Europe)" (`0x27`) via title byte `0x142` and with ambiguity char `'B'`:
 
+(This example is for standard UNIX shells. Other command line interpreters might need other kinds of quotes.)
+
 ```sh
-./titchack.py myrom.cgb '$142' --checksum '0x27' --ambiguous 'B' --fixlicensee yes --headeraddress '#0x14D' --type both
+$ ./titchack.py myrom.cgb '$142' --checksum '0x27' --ambiguous 'B' --fixlicensee yes --headeraddress '#0x14D' --type both
 ```
 
 We also fixed the header checksum and the licensee byte(s) to create a working rom.
@@ -32,8 +34,10 @@ You can reduce the space occupied by the header and use unused bytes for the hea
 
 ## Example
 
+(This example is for standard UNIX shells. Other command line interpreters might need other kinds of quotes.)
+
 ```sh
-./titchack.py -theader myrom.cgb '0447'
+$ ./titchack.py -theader myrom.cgb '0447'
 ```
 
 ## Notice
